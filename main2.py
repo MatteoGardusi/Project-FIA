@@ -1,8 +1,6 @@
 import time
 import pandas as pd
 import numpy as np
-import matplotlib as plt
-import plotly.graph_objects as go
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import GroupKFold
 from sklearn.neighbors import KNeighborsClassifier
@@ -10,6 +8,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, precision_score, recall_score
 # from sdv.single_table import CTGANSynthesizer
 # from sdv.metadata import SingleTableMetadata
@@ -23,12 +22,8 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 init = time.time()
 
 # Carichiamo il CSV
-# df = pd.read_csv('nilm/nilm/anonimized/25day_dataset.csv', sep=',', header=0, index_col=0)
-df = pd.read_csv(
-    'C:/Users/giord/OneDrive - alcampus.it/ISI 1° anno/Intelligenza '
-    'artificiale/Challenge/codici/nilm/nilm/anonimized/25day_dataset.csv',
-    sep=',', header=0, index_col=0)
-timestamps = df.index.tolist()
+df = pd.read_csv('nilm/anonimized/25day_dataset.csv', sep=',', header=0, index_col=0)
+
 df_small = df[
     ['ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real', 'harmonic1_Imaginary', 'harmonic3_Real',
      'harmonic3_Imaginary', 'harmonic5_Real', 'harmonic5_Imaginary', 'wahing_machine', 'dishwasher', 'oven']]
@@ -38,6 +33,9 @@ df_small['wahing_machine'] = df_small['wahing_machine'].apply(lambda x: 1 if x >
 df_small['dishwasher'] = df_small['dishwasher'].apply(lambda x: 1 if x > 0 else 0)
 df_small['oven'] = df_small['oven'].apply(lambda x: 1 if x > 0 else 0)
 
+# Eliminiamo i NaN
+df_small = df_small.dropna()
+
 """
 # Essendo il dataset un po' rumoroso, proviamo a pulirlo, usando un algoritmo di smoothing, come un filtro passa-basso
 df_small['ActivePower'] = df_small['ActivePower'].rolling(10).mean()
@@ -45,11 +43,9 @@ df_small['ReactivePower'] = df_small['ReactivePower'].rolling(10).mean()
 df_small['Voltage'] = df_small['Voltage'].rolling(10).mean()
 df_small['Current'] = df_small['Current'].rolling(10).mean()
 
-# Eliminiamo i NaN
-df_small = df_small.dropna()
-
 # Grafichiamo i dati con plotly, voglio vedere se il filtro ha funzionato, facciamo solo il primo giorno però, 
 # cioè i primi 86400 secondi
+timestamps = df.index.tolist()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=timestamps[:86400], y=df_small['ActivePower'][:86400], mode='lines', name='ActivePower'))
 fig.add_trace(go.Scatter(x=timestamps[:86400], y=df_small['ReactivePower'][:86400], mode='lines', name='ReactivePower'))
@@ -64,9 +60,6 @@ fig.add_trace(go.Scatter(x=timestamps[:86400], y=df_small['oven'][:86400], mode=
 # fig.write_html('plotly.html', auto_open=True)
 """
 
-# elimino molti campioni di classe 0
-df_small.drop(df_small.query('dishwasher == 0 & oven == 0 & wahing_machine == 0').sample(frac=.5).index, inplace=True)
-
 # creo i gruppi corrispondenti ai 25 giorni
 day_groups = pd.to_datetime(df_small.index.to_series()).dt.day.values
 
@@ -79,31 +72,44 @@ results_DT = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_MLP = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_AdaBoost = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 
+# KFold
 for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogni fold
+    # i dataset di training e test per la fold
     X_train, X_test = df_small.iloc[train_index], df_small.iloc[test_index]
-    print("test: ", pd.to_datetime(X_test.index.to_series()).dt.day.unique())
-    print("training: ", pd.to_datetime(X_train.index.to_series()).dt.day.unique())
 
-    # le label di training per i rispettivi classificatori
+    # print("test: ", pd.to_datetime(X_test.index.to_series()).dt.day.unique())
+    # print("training: ", pd.to_datetime(X_train.index.to_series()).dt.day.unique())
+
+    # scarto nel training dei campioni di "classe 0", ne mantengo la frazione frac
+    frac = 0.7
+    X_train.drop(X_train.query('dishwasher == 0 & oven == 0 & wahing_machine == 0').sample(frac=frac).index,
+                 inplace=True)
+
+    # prendo le labels di training per i rispettivi classificatori
     y_train_washing_machine = X_train['wahing_machine']
     y_train_dishwasher = X_train['dishwasher']
     y_train_oven = X_train['oven']
 
-    # le label di test per i rispettivi classificatori
+    # prendo le labels di test per i rispettivi classificatori
     y_test_washing_machine = X_test['wahing_machine']
     y_test_dishwasher = X_test['dishwasher']
     y_test_oven = X_test['oven']
 
-    # tolgo le labels dai dataset
+    # tolgo le labels dai dataset di training e test
     X_train = X_train.drop(['wahing_machine', 'dishwasher', 'oven'], axis=1)
-
     X_test = X_test.drop(['wahing_machine', 'dishwasher', 'oven'], axis=1)
 
     # applico una normalizzazione min-max ai dati
     scaler = MinMaxScaler()
     scaler.fit(X_train)
-    X_train_norm = scaler.transform(X_train)
-    X_test_norm = scaler.transform(X_test)
+    X_train_norm = pd.DataFrame(scaler.transform(X_train),
+                                columns=['ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real',
+                                         'harmonic1_Imaginary', 'harmonic3_Real', 'harmonic3_Imaginary',
+                                         'harmonic5_Real', 'harmonic5_Imaginary'])
+    X_test_norm = pd.DataFrame(scaler.transform(X_test),
+                               columns=['ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real',
+                                        'harmonic1_Imaginary', 'harmonic3_Real', 'harmonic3_Imaginary',
+                                        'harmonic5_Real', 'harmonic5_Imaginary'])
 
     '''
     ## MLP per la lavatrice
@@ -130,7 +136,6 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     '''
 
     # KNN
-    print('KNN')
     # lavatrice
     knn_washing_machine = KNeighborsClassifier(n_neighbors=5)
     knn_washing_machine.fit(X_train_norm, y_train_washing_machine)
@@ -211,7 +216,7 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     results_AdaBoost = results_AdaBoost.append(
         {'Class': 'washing_machine', 'Accuracy': accuracy_wm_ada, 'Precision': precision_wm_ada, 'Recall': recall_wm_ada},
         ignore_index=True)
-    
+
     # MLP
     results_MLP = results_MLP.append(
         {'Class': 'washing_machine', 'Accuracy': accuracy_wm_mlp, 'Precision': precision_wm_mlp,
