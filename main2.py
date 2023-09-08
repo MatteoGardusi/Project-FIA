@@ -22,16 +22,17 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 init = time.time()
 
 # Carichiamo il CSV
-df = pd.read_csv('nilm/anonimized/25day_dataset.csv', sep=',', header=0, index_col=0)
+df = pd.read_csv('nilm/anonimized/25day_dataset.csv', sep=',')
 
 df_small = df[
-    ['ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real', 'harmonic1_Imaginary', 'harmonic3_Real',
+    ['DateTime', 'ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real', 'harmonic1_Imaginary',
+     'harmonic3_Real',
      'harmonic3_Imaginary', 'harmonic5_Real', 'harmonic5_Imaginary', 'wahing_machine', 'dishwasher', 'oven']]
 
 # trasformiamo i valori delle 3 colonne target in 0 e 1
-df_small['wahing_machine'] = df_small['wahing_machine'].apply(lambda x: 1 if x > 0 else 0)
-df_small['dishwasher'] = df_small['dishwasher'].apply(lambda x: 1 if x > 0 else 0)
-df_small['oven'] = df_small['oven'].apply(lambda x: 1 if x > 0 else 0)
+df_small.loc[:, 'wahing_machine'] = df_small['wahing_machine'].apply(lambda x: 1 if x > 0 else 0)
+df_small.loc[:, 'dishwasher'] = df_small['dishwasher'].apply(lambda x: 1 if x > 0 else 0)
+df_small.loc[:, 'oven'] = df_small['oven'].apply(lambda x: 1 if x > 0 else 0)
 
 # Eliminiamo i NaN
 df_small = df_small.dropna()
@@ -61,7 +62,7 @@ fig.add_trace(go.Scatter(x=timestamps[:86400], y=df_small['oven'][:86400], mode=
 """
 
 # creo i gruppi corrispondenti ai 25 giorni
-day_groups = pd.to_datetime(df_small.index.to_series()).dt.day.values
+day_groups = pd.to_datetime(df_small.DateTime).dt.day.values
 
 # creo le 10 fold con i gruppi
 kf = GroupKFold(n_splits=10)
@@ -95,9 +96,9 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     y_test_dishwasher = X_test['dishwasher']
     y_test_oven = X_test['oven']
 
-    # tolgo le labels dai dataset di training e test
-    X_train = X_train.drop(['wahing_machine', 'dishwasher', 'oven'], axis=1)
-    X_test = X_test.drop(['wahing_machine', 'dishwasher', 'oven'], axis=1)
+    # tolgo le labels e i datetime dai dataset di training e test
+    X_train = X_train.drop(['DateTime', 'wahing_machine', 'dishwasher', 'oven'], axis=1)
+    X_test = X_test.drop(['DateTime', 'wahing_machine', 'dishwasher', 'oven'], axis=1)
 
     # applico una normalizzazione min-max ai dati
     scaler = MinMaxScaler()
@@ -192,13 +193,13 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
 
     # Calcolo i risultati per la fold in questione
     # KNN
-    results_KNN = results_KNN.append(
+    results_KNN = results_KNN._append(
         {'Class': 'washing_machine', 'Accuracy': accuracy_wm, 'Precision': precision_wm, 'Recall': recall_wm},
         ignore_index=True)
-    results_KNN = results_KNN.append(
+    results_KNN = results_KNN._append(
         {'Class': 'dishwasher', 'Accuracy': accuracy_dw, 'Precision': precision_dw, 'Recall': recall_dw},
         ignore_index=True)
-    results_KNN = results_KNN.append(
+    results_KNN = results_KNN._append(
         {'Class': 'oven', 'Accuracy': accuracy_ov, 'Precision': precision_ov, 'Recall': recall_ov}, ignore_index=True)
 
     '''
