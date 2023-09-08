@@ -73,6 +73,7 @@ results_DT = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_MLP = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_AdaBoost = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 
+
 # KFold
 for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogni fold
     # i dataset di training e test per la fold
