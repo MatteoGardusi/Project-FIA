@@ -185,28 +185,22 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     knn_washing_machine.fit(X_train_norm, y_train_washing_machine)
     y_pred_washing_machine = knn_washing_machine.predict(X_test_norm)
     accuracy_wm = accuracy_score(y_test_washing_machine, y_pred_washing_machine)
-    precision_wm = precision_score(y_test_washing_machine, y_pred_washing_machine) if sum(
-        y_pred_washing_machine) != 0 else None
-    recall_wm = recall_score(y_test_washing_machine, y_pred_washing_machine) if sum(
-        y_test_washing_machine) != 0 else None
+    precision_wm = precision_score(y_test_washing_machine, y_pred_washing_machine)
+    recall_wm = recall_score(y_test_washing_machine, y_pred_washing_machine)
     # lavastoviglie
     knn_dishwasher = KNeighborsClassifier(n_neighbors=5)
     knn_dishwasher.fit(X_train_norm, y_train_dishwasher)
     y_pred_dishwasher = knn_dishwasher.predict(X_test_norm)
     accuracy_dw = accuracy_score(y_test_dishwasher, y_pred_dishwasher)
-    precision_dw = precision_score(y_test_dishwasher, y_pred_dishwasher) if sum(
-        y_pred_dishwasher) != 0 else None
-    recall_dw = recall_score(y_test_dishwasher, y_pred_dishwasher) if sum(
-        y_test_dishwasher) != 0 else None
+    precision_dw = precision_score(y_test_dishwasher, y_pred_dishwasher)
+    recall_dw = recall_score(y_test_dishwasher, y_pred_dishwasher)
     # forno
     knn_oven = KNeighborsClassifier(n_neighbors=5)
     knn_oven.fit(X_train_norm, y_train_oven)
     y_pred_oven = knn_oven.predict(X_test_norm)
     accuracy_ov = accuracy_score(y_test_oven, y_pred_oven)
-    precision_ov = precision_score(y_test_oven, y_pred_oven) if sum(
-        y_pred_oven) != 0 else None
-    recall_ov = recall_score(y_test_oven, y_pred_oven) if sum(
-        y_test_oven) != 0 else None
+    precision_ov = precision_score(y_test_oven, y_pred_oven)
+    recall_ov = recall_score(y_test_oven, y_pred_oven)
 
     '''
     # Decision Tree
