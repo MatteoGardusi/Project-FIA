@@ -107,6 +107,7 @@ day_groups = pd.to_datetime(df_small.DateTime).dt.day.values
 kf = GroupKFold(n_splits=10)
 
 results_KNN = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
+results_RF = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_SVM = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_DT = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_MLP = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
@@ -179,6 +180,7 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     recall_wm_ada = recall_score(y_test_washing_machine, y_pred_washing_machine_ada)
     '''
 
+    '''
     # KNN
     # lavatrice
     knn_washing_machine = KNeighborsClassifier(n_neighbors=5)
@@ -201,6 +203,7 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     accuracy_ov = accuracy_score(y_test_oven, y_pred_oven)
     precision_ov = precision_score(y_test_oven, y_pred_oven)
     recall_ov = recall_score(y_test_oven, y_pred_oven)
+    '''
 
     '''
     # Decision Tree
@@ -228,7 +231,43 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     recall_ov_DT = recall_score(y_test_oven, y_pred_oven_DT)
     '''
 
+    # Random Forest
+    # lavatrice
+    rf_washing_machine = RandomForestClassifier(n_estimators=100, criterion="gini", max_depth=None)
+    rf_washing_machine.fit(X_train_norm, y_train_washing_machine)
+    rf_y_pred_washing_machine = rf_washing_machine.predict(X_test_norm)
+    rf_accuracy_wm = accuracy_score(y_test_washing_machine, rf_y_pred_washing_machine)
+    rf_precision_wm = precision_score(y_test_washing_machine, rf_y_pred_washing_machine)
+    rf_recall_wm = recall_score(y_test_washing_machine, rf_y_pred_washing_machine)
+    # lavastoviglie
+    rf_dishwasher = RandomForestClassifier(n_estimators=100, criterion="gini", max_depth=None)
+    rf_dishwasher.fit(X_train_norm, y_train_dishwasher)
+    rf_y_pred_dishwasher = rf_dishwasher.predict(X_test_norm)
+    rf_accuracy_dw = accuracy_score(y_test_dishwasher, rf_y_pred_dishwasher)
+    rf_precision_dw = precision_score(y_test_dishwasher, rf_y_pred_dishwasher)
+    rf_recall_dw = recall_score(y_test_dishwasher, rf_y_pred_dishwasher)
+    # forno
+    rf_oven = RandomForestClassifier(n_estimators=100, criterion="gini", max_depth=None)
+    rf_oven.fit(X_train_norm, y_train_oven)
+    rf_y_pred_oven = rf_oven.predict(X_test_norm)
+    rf_accuracy_ov = accuracy_score(y_test_oven, rf_y_pred_oven)
+    rf_precision_ov = precision_score(y_test_oven, rf_y_pred_oven)
+    rf_recall_ov = recall_score(y_test_oven, rf_y_pred_oven)
+
     # Calcolo i risultati per la fold in questione
+
+    # Random Forest
+    results_RF = results_RF._append(
+        {'Class': 'washing_machine', 'Accuracy': rf_accuracy_wm, 'Precision': rf_precision_wm, 'Recall': rf_recall_wm},
+        ignore_index=True)
+    results_RF = results_RF._append(
+        {'Class': 'dishwasher', 'Accuracy': rf_accuracy_dw, 'Precision': rf_precision_dw, 'Recall': rf_recall_dw},
+        ignore_index=True)
+    results_RF = results_RF._append(
+        {'Class': 'oven', 'Accuracy': rf_accuracy_ov, 'Precision': rf_precision_ov, 'Recall': rf_recall_ov},
+        ignore_index=True)
+
+    '''
     # KNN
     results_KNN = results_KNN._append(
         {'Class': 'washing_machine', 'Accuracy': accuracy_wm, 'Precision': precision_wm, 'Recall': recall_wm},
@@ -239,7 +278,6 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
     results_KNN = results_KNN._append(
         {'Class': 'oven', 'Accuracy': accuracy_ov, 'Precision': precision_ov, 'Recall': recall_ov}, ignore_index=True)
 
-    '''
     # Decision Tree
     results_DT = results_DT.append(
         {'Class': 'washing_machine', 'Accuracy': accuracy_wm_DT, 'Precision': precision_wm_DT, 'Recall': recall_wm_DT},
@@ -262,15 +300,16 @@ for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogn
         ignore_index=True)
     '''
 
+
 winsound.Beep(1000, 1000)
 
 # Printiamo i classification report dell'ultima fold
 print('Classification report KNN washing machine')
-print(classification_report(y_test_washing_machine, y_pred_washing_machine))
+print(classification_report(y_test_washing_machine, rf_y_pred_washing_machine))
 print('Classification report KNN dishwasher')
-print(classification_report(y_test_dishwasher, y_pred_dishwasher))
+print(classification_report(y_test_dishwasher, rf_y_pred_dishwasher))
 print('Classification report KNN oven')
-print(classification_report(y_test_oven, y_pred_oven))
+print(classification_report(y_test_oven, rf_y_pred_oven))
 '''
 print('Classification report DT washing machine')
 print(classification_report(y_test_washing_machine, y_pred_washing_machine_DT))
@@ -285,9 +324,12 @@ print(classification_report(y_test_washing_machine, y_pred_washing_machine_mlp))
 '''
 
 # aggiungo le F1 score per ogni fold
+
+results_RF['F1'] = 2 * (results_RF['Precision'] * results_RF['Recall']) / (
+        results_RF['Precision'] + results_RF['Recall'])
+'''
 results_KNN['F1'] = 2 * (results_KNN['Precision'] * results_KNN['Recall']) / (
         results_KNN['Precision'] + results_KNN['Recall'])
-'''
 results_DT['F1'] = 2 * (results_DT['Precision'] * results_DT['Recall']) / (
         results_DT['Precision'] + results_DT['Recall'])
 results_AdaBoost['F1'] = 2 * (results_AdaBoost['Precision'] * results_AdaBoost['Recall']) / (
@@ -297,11 +339,13 @@ results_MLP['F1'] = 2 * (results_MLP['Precision'] * results_MLP['Recall']) / (
 '''
 
 # calcolo le metriche aggregate (medie sulle fold)
+results_RF_mean = results_RF.groupby(['Class']).mean()
 results_DT_mean = results_DT.groupby(['Class']).mean()
 results_KNN_mean = results_KNN.groupby(['Class']).mean()
 results_AdaBoost_mean = results_AdaBoost.groupby(['Class']).mean()
 results_MLP_mean = results_MLP.groupby(['Class']).mean()
 
+results_RF.to_csv('Results/Results_RF.csv', index_label=results_RF.index.name)
 results_DT.to_csv('Results/Results_DT.csv', index_label=results_DT.index.name)
 results_DT_mean.to_csv('Results/Results_DT_mean.csv', index_label=results_DT_mean.index.name)
 results_KNN.to_csv('Results/Results_KNN.csv', index_label=results_KNN.index.name)
