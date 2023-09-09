@@ -1,3 +1,4 @@
+import random
 import time
 import pandas as pd
 import numpy as np
@@ -18,11 +19,49 @@ from sklearn.metrics import accuracy_score, classification_report, precision_sco
 import warnings
 import winsound
 
+
+def check_fold_days(training: pd.DataFrame, test: pd.DataFrame, cls_structure: pd.DataFrame) -> tuple:
+    """
+
+    :param training:
+    :param test:
+    :param cls_structure:
+    :return: tuple
+    """
+
+    training_days = pd.to_datetime(training["DateTime"]).dt.day.unique()
+    test_days = pd.to_datetime(test["DateTime"]).dt.day.unique()
+    classes = cls_structure.columns
+
+    # trovo le classi mancanti nel dataset di test
+    cls_test = cls_structure.iloc[test_days - 1].sum()
+    missing = cls_test.loc[cls_test == 0].index.tolist()
+
+    # se nessun elettrodomestico manca, restituisco training e test iniziali
+    if len(missing) == 0:
+        return training, test
+
+    # seleziono i giorni che contengono tutti gli elettrodomestici
+    days = cls_structure.loc[(cls_structure[missing] == 1).all(axis=1)].index + 1
+
+    # scelgo un giorno a caso
+    selected = random.choice(days)
+
+    # sposto il giorno dal training al test
+    map = pd.to_datetime(training["DateTime"]).dt.day == selected
+    day_ts = training[map]
+    training.drop(training[pd.to_datetime(training["DateTime"]).dt.day == selected].index, inplace=True)
+    test = pd.concat([test, day_ts])
+
+    return training, test
+
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 init = time.time()
 
 # Carichiamo il CSV
 df = pd.read_csv('nilm/anonimized/25day_dataset.csv', sep=',')
+appliance_daily_report = pd.read_csv('daily_report.csv').drop('DateTime', axis=1)
 
 df_small = df[
     ['DateTime', 'ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real', 'harmonic1_Imaginary',
@@ -73,19 +112,22 @@ results_DT = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_MLP = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 results_AdaBoost = pd.DataFrame(columns=['Class', 'Accuracy', 'Precision', 'Recall'])
 
-
 # KFold
 for train_index, test_index in kf.split(df_small, groups=day_groups):  # per ogni fold
     # i dataset di training e test per la fold
     X_train, X_test = df_small.iloc[train_index], df_small.iloc[test_index]
 
-    # print("test: ", pd.to_datetime(X_test.index.to_series()).dt.day.unique())
-    # print("training: ", pd.to_datetime(X_train.index.to_series()).dt.day.unique())
+    # faccio in modo che nel test vi siano tutti gli elettrodomestici
+    X_train, X_test = check_fold_days(X_train, X_test, appliance_daily_report)
 
-    # scarto nel training dei campioni di "classe 0", ne mantengo la frazione frac
-    frac = 0.7
+    # scarto nel training una frazione di campioni di "classe 0"
+    frac = 0.8
     X_train.drop(X_train.query('dishwasher == 0 & oven == 0 & wahing_machine == 0').sample(frac=frac).index,
                  inplace=True)
+
+    # solo per velocità, scartiamo i campioni di classe 0 anche nel test
+    # X_test.drop(X_test.query('dishwasher == 0 &
+    # oven == 0 & wahing_machine == 0').sample(frac=frac).index, inplace=True)
 
     # prendo le labels di training per i rispettivi classificatori
     y_train_washing_machine = X_train['wahing_machine']
