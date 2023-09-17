@@ -8,10 +8,19 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, class
 import random
 import warnings
 import joblib
+from tkinter import filedialog
 
 warnings.simplefilter(action='ignore')
 
-df = pd.read_csv('nilm/nilm/anonimized/25day_dataset.csv', sep=',')
+# Aprire la finestra di dialogo per la selezione del file
+file_path = filedialog.askopenfilename(title="Seleziona il file CSV", filetypes=[("File CSV", "*.csv")])
+
+# Verificare se è stato selezionato un file
+if file_path:
+    # Leggere il file CSV
+    df = pd.read_csv(file_path, sep=',')
+else:
+    raise Exception("Nessun file selezionato")
 timestamps = df.index.tolist()
 
 df_small = df[
