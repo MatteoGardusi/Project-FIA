@@ -4,47 +4,31 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import KFold
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report
+from sklearn.metrics import accuracy_score, precision_score, recall_score
 import random
 import warnings
 import joblib
 from tkinter import filedialog
-
 warnings.simplefilter(action='ignore')
 
-# Aprire la finestra di dialogo per la selezione del file
+# Seleziono il file CSV
 file_path = filedialog.askopenfilename(title="Seleziona il file CSV", filetypes=[("File CSV", "*.csv")])
 
 # Verificare se è stato selezionato un file
 if file_path:
-    # Leggere il file CSV
     df = pd.read_csv(file_path, sep=',')
 else:
     raise Exception("Nessun file selezionato")
-timestamps = df.index.tolist()
 
 df_small = df[
     ['ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real', 'harmonic1_Imaginary',
      'harmonic3_Real',
      'harmonic3_Imaginary', 'harmonic5_Real', 'harmonic5_Imaginary', 'wahing_machine', 'dishwasher', 'oven']]
 
+# Andiamo a trasformare le classi in 0 e 1, in quanto ci occuperemo di classificazione binaria
 df_small.loc[:, 'wahing_machine'] = df_small['wahing_machine'].apply(lambda x: 1 if x > 0 else 0)
 df_small.loc[:, 'dishwasher'] = df_small['dishwasher'].apply(lambda x: 1 if x > 0 else 0)
 df_small.loc[:, 'oven'] = df_small['oven'].apply(lambda x: 1 if x > 0 else 0)
-
-harmonic1_mod = np.sqrt(df['harmonic1_Real'] ** 2 + df['harmonic1_Imaginary'] ** 2)
-harmonic3_mod = np.sqrt(df['harmonic3_Real'] ** 2 + df['harmonic3_Imaginary'] ** 2)
-harmonic5_mod = np.sqrt(df['harmonic5_Real'] ** 2 + df['harmonic5_Imaginary'] ** 2)
-
-df_small['harmonic1_mod'] = harmonic1_mod
-df_small['harmonic3_mod'] = harmonic3_mod
-df_small['harmonic5_mod'] = harmonic5_mod
-
-'''
-df_small.loc[:, 'wahing_machine'] = df_small['wahing_machine'].apply(lambda x: 1 if x > 0 else 0)
-df_small.loc[:, 'dishwasher'] = df_small['dishwasher'].apply(lambda x: 1 if x > 0 else 0)
-df_small.loc[:, 'oven'] = df_small['oven'].apply(lambda x: 1 if x > 0 else 0)
-'''
 
 kf = KFold(n_splits=10, shuffle=True)
 kf.get_n_splits(df_small)
@@ -55,6 +39,9 @@ init = time.time()
 for train_index, test_index in kf.split(df_small):
 
     X_train, X_test = df_small.iloc[train_index], df_small.iloc[test_index]
+    # Questa parte di codice serve ridurre la dimensione del dataset di training, in quanto la classe off è molto
+    # più numerosa delle altre. Riducendo il dataset di training, si ottiene una leggera diminuzione delle performance
+    # a fronte di un notevole risparmio di tempo di esecuzione
     '''
     X_train = X_train.drop(
         X_train[(X_train['wahing_machine'] == 0) & (X_train['dishwasher'] == 0) & (X_train['oven'] == 0)].sample(
@@ -63,7 +50,6 @@ for train_index, test_index in kf.split(df_small):
     y_train_washing_machine = X_train['wahing_machine']
     y_train_dishwasher = X_train['dishwasher']
     y_train_oven = X_train['oven']
-    # creiamo le label per il classificatore, che sarà 1 se nessuno dei tre è acceso e 0 altrimenti
     y_train_off = X_train.apply(
         lambda x: 1 if x['wahing_machine'] == 0 and x['dishwasher'] == 0 and x['oven'] == 0 else 0,
         axis=1)
@@ -119,16 +105,19 @@ for train_index, test_index in kf.split(df_small):
     recall_off_rf = recall_score(y_test_off, y_pred_off)
     off_prob = rf_off.predict_proba(X_test_norm)
 
-    results_RF = results_RF.append({'Class': 'Washing Machine', 'Accuracy': accuracy_wm_rf,
+    results_RF = results_RF._append({'Class': 'Washing Machine', 'Accuracy': accuracy_wm_rf,
                                     'Precision': precision_wm_rf, 'Recall': recall_wm_rf}, ignore_index=True)
-    results_RF = results_RF.append({'Class': 'Dishwasher', 'Accuracy': accuracy_dw_rf,
+    results_RF = results_RF._append({'Class': 'Dishwasher', 'Accuracy': accuracy_dw_rf,
                                     'Precision': precision_dw_rf, 'Recall': recall_dw_rf}, ignore_index=True)
-    results_RF = results_RF.append({'Class': 'Oven', 'Accuracy': accuracy_ov_rf,
+    results_RF = results_RF._append({'Class': 'Oven', 'Accuracy': accuracy_ov_rf,
                                     'Precision': precision_ov_rf, 'Recall': recall_ov_rf}, ignore_index=True)
-    results_RF = results_RF.append({'Class': 'Off', 'Accuracy': accuracy_off_rf,
+    results_RF = results_RF._append({'Class': 'Off', 'Accuracy': accuracy_off_rf,
                                     'Precision': precision_off_rf, 'Recall': recall_off_rf}, ignore_index=True)
 
-    # Creo un dataframe con le predizioni dei quattro classificatori come colonne
+    # Una volta aver addestrato i quattro modelli sulla classe di interesse, si procede a introdurre uno strato di
+    # classificazione finale che, in base alle probabilità di appartenenza alle classi, assegna l'istanza alla classe
+    # con probabilità maggiore.
+
     y_pred = pd.DataFrame({'Washing Machine': y_pred_washing_machine, 'Dishwasher': y_pred_dishwasher,
                            'Oven': y_pred_oven, 'Off': y_pred_off})
 
@@ -156,7 +145,7 @@ for train_index, test_index in kf.split(df_small):
                 else:
                     print(i)
                     indici = y_prob_row[y_prob_row == 1].index
-                    indice = random.choice(indici)
+                    indice = random.choice(list(indici))
                     y_prob_row[y_prob_row == 1] = 0
                     y_prob_row[indice] = 1
             y_pred_final.iloc[i] = y_prob_row
@@ -177,14 +166,16 @@ for train_index, test_index in kf.split(df_small):
     precision_ov = precision_score(y_test_oven, y_pred_final['oven'])
     recall_ov = recall_score(y_test_oven, y_pred_final['oven'])
 
-    results_ME = results_ME.append({'Class': 'Total', 'Accuracy': accuracy_final,
+    results_ME = results_ME._append({'Class': 'Total', 'Accuracy': accuracy_final,
                                     'Precision': precision_final, 'Recall': recall_final}, ignore_index=True)
-    results_ME = results_ME.append({'Class': 'Washing Machine', 'Accuracy': accuracy_wm,
+    results_ME = results_ME._append({'Class': 'Washing Machine', 'Accuracy': accuracy_wm,
                                     'Precision': precision_wm, 'Recall': recall_wm}, ignore_index=True)
-    results_ME = results_ME.append({'Class': 'Dishwasher', 'Accuracy': accuracy_dw,
+    results_ME = results_ME._append({'Class': 'Dishwasher', 'Accuracy': accuracy_dw,
                                     'Precision': precision_dw, 'Recall': recall_dw}, ignore_index=True)
-    results_ME = results_ME.append({'Class': 'Oven', 'Accuracy': accuracy_ov,
+    results_ME = results_ME._append({'Class': 'Oven', 'Accuracy': accuracy_ov,
                                     'Precision': precision_ov, 'Recall': recall_ov}, ignore_index=True)
+
+    # Si salvano i modelli addestrati e lo scaler per la normalizzazione dei dati.
     joblib.dump(rf_washing_machine, 'Models/RF_washing_machine_' + str(k) + '.pkl')
     joblib.dump(rf_dishwasher, 'Models/RF_dishwasher_' + str(k) + '.pkl')
     joblib.dump(rf_oven, 'Models/RF_oven_' + str(k) + '.pkl')
@@ -202,7 +193,6 @@ results_ME['F1'] = 2 * (results_ME['Precision'] * results_ME['Recall']) / (
 results_RF_mean = results_RF.groupby(['Class']).mean()
 results_ME_mean = results_ME.groupby(['Class']).mean()
 
-# Voglio calcolare anche le deviazioni standard e metterle accanto alle medie
 results_RF_std = results_RF.groupby(['Class']).std()
 results_ME_std = results_ME.groupby(['Class']).std()
 

@@ -5,7 +5,6 @@ import random
 import warnings
 import joblib
 from tkinter import filedialog
-
 warnings.filterwarnings('ignore')
 
 # Aprire la finestra di dialogo per la selezione del file
@@ -22,10 +21,6 @@ df_small = df[
     ['ActivePower', 'ReactivePower', 'Voltage', 'Current', 'harmonic1_Real', 'harmonic1_Imaginary',
      'harmonic3_Real',
      'harmonic3_Imaginary', 'harmonic5_Real', 'harmonic5_Imaginary', 'wahing_machine', 'dishwasher', 'oven']]
-
-df_small = df_small.drop(
-  df_small[(df_small['wahing_machine'] == 0) & (df_small['dishwasher'] == 0) & (df_small['oven'] == 0)].sample(
-      frac=0.98).index)
 
 df_small.loc[:, 'wahing_machine'] = df_small['wahing_machine'].apply(lambda x: 1 if x > 0 else 0)
 df_small.loc[:, 'dishwasher'] = df_small['dishwasher'].apply(lambda x: 1 if x > 0 else 0)
@@ -156,5 +151,3 @@ results_ME_mean = results_ME.groupby(['Class']).mean()
 
 results_ME.to_csv('Results/Results_ME_final.csv', index_label=results_ME.index.name)
 results_ME_mean.to_csv('Results/Results_ME_mean_final.csv', index_label=results_ME_mean.index.name)
-
-
