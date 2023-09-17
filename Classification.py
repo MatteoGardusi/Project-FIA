@@ -7,12 +7,12 @@ import joblib
 from tkinter import filedialog
 warnings.filterwarnings('ignore')
 
-# Aprire la finestra di dialogo per la selezione del file
+# Aprire la finestra per selezionare il file CSV
 file_path = filedialog.askopenfilename(title="Seleziona il file CSV", filetypes=[("File CSV", "*.csv")])
 
 # Verificare se è stato selezionato un file
 if file_path:
-    # Leggere il file CSV
+
     df = pd.read_csv(file_path, sep=',')
 else:
     raise Exception("Nessun file selezionato")
